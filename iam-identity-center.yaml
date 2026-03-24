@@ -1,0 +1,155 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: IAM Identity Center Account Instance + Test Group + Test User (Custom Resource)
+
+Parameters:
+  InstanceName:
+    Type: String
+    Default: eks-argocd-sso
+  GroupName:
+    Type: String
+    Default: testgroup
+  UserName:
+    Type: String
+    Default: testuser
+  UserDisplayName:
+    Type: String
+    Default: Test User
+  UserEmail:
+    Type: String
+    Default: testuser@example.com
+  UserFirstName:
+    Type: String
+    Default: Test
+  UserLastName:
+    Type: String
+    Default: User
+
+Resources:
+  # ============ Identity Center Instance ============
+  SSOInstance:
+    Type: AWS::SSO::Instance
+    Properties:
+      Name: !Ref InstanceName
+      Tags:
+        - Key: Purpose
+          Value: eks-argocd-handson
+
+  # ============ Group ============
+  TestGroup:
+    Type: AWS::IdentityStore::Group
+    Properties:
+      IdentityStoreId: !GetAtt SSOInstance.IdentityStoreId
+      DisplayName: !Ref GroupName
+      Description: ArgoCD handson test group
+
+  # ============ Lambda Role for Custom Resource ============
+  UserLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${InstanceName}-user-lambda-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: IdentityStoreAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - identitystore:CreateUser
+                  - identitystore:DeleteUser
+                  - identitystore:DescribeUser
+                Resource: '*'
+
+  # ============ Lambda Function ============
+  UserLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${InstanceName}-create-user'
+      Runtime: python3.12
+      Handler: index.handler
+      Timeout: 30
+      Role: !GetAtt UserLambdaRole.Arn
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          import traceback
+
+          def handler(event, context):
+              try:
+                  props = event['ResourceProperties']
+                  identity_store_id = props['IdentityStoreId']
+                  client = boto3.client('identitystore')
+
+                  if event['RequestType'] in ['Create', 'Update']:
+                      # Delete old user on Update
+                      if event['RequestType'] == 'Update':
+                          old_user_id = event.get('PhysicalResourceId', '')
+                          if old_user_id and old_user_id != 'NONE':
+                              try:
+                                  client.delete_user(IdentityStoreId=identity_store_id, UserId=old_user_id)
+                              except Exception:
+                                  pass
+
+                      resp = client.create_user(
+                          IdentityStoreId=identity_store_id,
+                          UserName=props['UserName'],
+                          DisplayName=props['DisplayName'],
+                          Name={'GivenName': props['FirstName'], 'FamilyName': props['LastName']},
+                          Emails=[{'Value': props['Email'], 'Primary': True, 'Type': 'work'}]
+                      )
+                      user_id = resp['UserId']
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {'UserId': user_id}, user_id)
+
+                  elif event['RequestType'] == 'Delete':
+                      user_id = event.get('PhysicalResourceId', '')
+                      if user_id and user_id != 'NONE':
+                          try:
+                              client.delete_user(IdentityStoreId=identity_store_id, UserId=user_id)
+                          except Exception:
+                              pass
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+
+              except Exception as e:
+                  traceback.print_exc()
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': str(e)}, 'NONE')
+
+  # ============ Custom Resource: User ============
+  TestUser:
+    Type: Custom::IdentityStoreUser
+    DependsOn: SSOInstance
+    Properties:
+      ServiceToken: !GetAtt UserLambda.Arn
+      IdentityStoreId: !GetAtt SSOInstance.IdentityStoreId
+      UserName: !Ref UserName
+      DisplayName: !Ref UserDisplayName
+      FirstName: !Ref UserFirstName
+      LastName: !Ref UserLastName
+      Email: !Ref UserEmail
+
+  # ============ Group Membership ============
+  TestGroupMembership:
+    Type: AWS::IdentityStore::GroupMembership
+    Properties:
+      IdentityStoreId: !GetAtt SSOInstance.IdentityStoreId
+      GroupId: !GetAtt TestGroup.GroupId
+      MemberId:
+        UserId: !GetAtt TestUser.UserId
+
+Outputs:
+  InstanceArn:
+    Value: !GetAtt SSOInstance.InstanceArn
+  IdentityStoreId:
+    Value: !GetAtt SSOInstance.IdentityStoreId
+  GroupId:
+    Value: !GetAtt TestGroup.GroupId
+  UserId:
+    Value: !GetAtt TestUser.UserId
