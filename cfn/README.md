@@ -1,4 +1,34 @@
-erFirstName` | `Test` | 유저 이름(First) |
+# CloudFormation 스택
+
+핸즈온에 필요한 AWS 인프라를 프로비저닝하는 CloudFormation 템플릿입니다.
+
+## 1. identity-center.yaml
+
+IAM Identity Center(Account 인스턴스) + 테스트 그룹/유저를 생성합니다.
+ArgoCD Capability에서 SSO 인증에 사용됩니다.
+
+> ⚠️ AWS Organizations 관리 계정에서는 `AWS::SSO::Instance`를 CFN으로 생성할 수 없습니다. 콘솔에서 직접 활성화하세요.
+
+### 배포
+
+```bash
+aws cloudformation deploy \
+  --template-file cfn/identity-center.yaml \
+  --stack-name identity-center-stack \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --region us-west-2
+```
+
+### 파라미터
+
+| 파라미터 | 기본값 | 설명 |
+|---------|--------|------|
+| `InstanceName` | `eks-argocd-sso` | Identity Center 인스턴스 이름 |
+| `GroupName` | `testgroup` | 생성할 그룹 이름 |
+| `UserName` | `testuser` | 생성할 유저 이름 |
+| `UserDisplayName` | `Test User` | 유저 표시 이름 |
+| `UserEmail` | `testuser@example.com` | 유저 이메일 |
+| `UserFirstName` | `Test` | 유저 이름(First) |
 | `UserLastName` | `User` | 유저 성(Last) |
 
 ### 주요 출력값
@@ -32,36 +62,7 @@ aws cloudformation deploy \
 ### 파라미터
 
 | 파라미터 | 기본값 | 설명 |
-|---------|------# CloudFormation 스택
-
-핸즈온에 필요한 AWS 인프라를 프로비저닝하는 CloudFormation 템플릿입니다.
-
-## 1. identity-center.yaml
-
-IAM Identity Center(Account 인스턴스) + 테스트 그룹/유저를 생성합니다.
-ArgoCD Capability에서 SSO 인증에 사용됩니다.
-
-> ⚠️ AWS Organizations 관리 계정에서는 `AWS::SSO::Instance`를 CFN으로 생성할 수 없습니다. 콘솔에서 직접 활성화하세요.
-
-### 배포
-
-```bash
-aws cloudformation deploy \
-  --template-file cfn/identity-center.yaml \
-  --stack-name identity-center-stack \
-  --capabilities CAPABILITY_NAMED_IAM \
-  --region us-west-2
-```
-
-### 파라미터
-
-| 파라미터 | 기본값 | 설명 |
 |---------|--------|------|
-| `InstanceName` | `eks-argocd-sso` | Identity Center 인스턴스 이름 |
-| `GroupName` | `testgroup` | 생성할 그룹 이름 |
-| `UserName` | `testuser` | 생성할 유저 이름 |
-| `UserDisplayName` | `Test User` | 유저 표시 이름 |
-| `UserEmail` | `testuser@example.com` --|------|
 | `GitHubOrg` | (필수) | GitHub 사용자명 또는 Organization 이름 |
 | `RepoName` | `todo-app-repository` | GitHub 레포지토리 이름 |
 
@@ -71,4 +72,3 @@ aws cloudformation deploy \
 |------|------|
 | `RoleArn` | GitHub Actions의 `AWS_ROLE_ARN` 변수에 설정할 IAM Role ARN |
 | `OIDCProviderArn` | GitHub OIDC Provider ARN |
-
