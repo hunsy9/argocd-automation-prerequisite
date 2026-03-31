@@ -1,0 +1,63 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Security Group - AWS Office / KR IP inbound (80, 443)
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: Security Group을 생성할 VPC ID
+
+Resources:
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Handson ALB Security Group
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        # AWS Office - HTTP
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 15.248.0.0/16
+          Description: AWS Office
+        # AWS Office - HTTPS
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 15.248.0.0/16
+          Description: AWS Office
+        # AWS KR IP (1) - HTTP
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 54.239.116.0/23
+          Description: AWS KR IP
+        # AWS KR IP (1) - HTTPS
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 54.239.116.0/23
+          Description: AWS KR IP
+        # AWS KR IP (2) - HTTP
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 54.239.119.0/25
+          Description: AWS KR IP
+        # AWS KR IP (2) - HTTPS
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 54.239.119.0/25
+          Description: AWS KR IP
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound
+      Tags:
+        - Key: Name
+          Value: handson-alb-sg
+
+Outputs:
+  SecurityGroupId:
+    Value: !Ref SecurityGroup
+    Description: 생성된 Security Group ID
