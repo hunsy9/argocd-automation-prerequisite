@@ -33,7 +33,7 @@ aws cloudformation deploy \
 
 ---
 
-## 3. ingress-security-group.yaml
+## 2. ingress-security-group.yaml
 
 핸즈온 ALB용 보안 그룹을 생성합니다. AWS 오피스 및 한국 IP 대역에서만 HTTP/HTTPS 접근을 허용합니다.
 
